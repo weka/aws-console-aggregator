@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -65,12 +66,12 @@ func findOverlappingEndingIndex(prev, latest string) int {
 	return i
 }
 
-func aggregateConsoleOutput(wg *sync.WaitGroup, folder, instanceId string, sess *session.Session) {
+func aggregateConsoleOutput(wg *sync.WaitGroup, folder, instanceId, instanceAlias string, sess *session.Session) {
 	defer wg.Done()
 
 	log.Printf("Instance %s: start aggregating console log", instanceId)
 
-	logPath := fmt.Sprintf("%s/%s.log", folder, instanceId)
+	logPath := fmt.Sprintf("%s/%s.log", folder, instanceAlias)
 
 	if f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err != nil {
 		log.Printf("Instance %s: failed opening file: %s", instanceId, logPath)
@@ -125,6 +126,18 @@ func parseParams() (string, string, arrayFlag) {
 	return *region, *folder, ids
 }
 
+func getInstanceIdAndAlias(id string) (string, string) {
+	var instanceAlias string
+	split := strings.Split(id, ":")
+	instanceId := split[0]
+	if len(split) > 1 {
+		instanceAlias = split[1]
+	} else {
+		instanceAlias = instanceId
+	}
+	return instanceId, instanceAlias
+}
+
 func main() {
 	log.Println("Running aws console log aggregator service...")
 
@@ -135,9 +148,10 @@ func main() {
 		log.Fatalln(err)
 	} else {
 		var wg sync.WaitGroup
-		for _, instanceId := range ids {
+		for _, id := range ids {
 			wg.Add(1)
-			go aggregateConsoleOutput(&wg, folder, instanceId, sess)
+			instanceId, instanceAlias := getInstanceIdAndAlias(id)
+			go aggregateConsoleOutput(&wg, folder, instanceId, instanceAlias, sess)
 		}
 		wg.Wait()
 	}
