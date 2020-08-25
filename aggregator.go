@@ -21,12 +21,12 @@ func getLatestOutput(instanceId string, sess *session.Session, latest bool) (str
 	}
 	ec2Svc := ec2.New(sess)
 	if result, err := ec2Svc.GetConsoleOutput(consoleInput); err != nil {
-		if err, ok := err.(awserr.Error); ok {
+		if awsErr, ok := err.(awserr.Error); ok {
 			// Non Nitro AWS instance types don't support retrieving the latest console logs
-			if err.Code() == "UnsupportedOperation" && latest {
+			if awsErr.Code() == "UnsupportedOperation" && latest {
 				return getLatestOutput(instanceId, sess, false)
 			} else {
-				return "", err
+				return "", awsErr
 			}
 		} else {
 			return "", err
